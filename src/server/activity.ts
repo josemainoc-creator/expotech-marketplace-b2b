@@ -1,3 +1,5 @@
+import type { Prisma } from "@prisma/client";
+
 import { prisma } from "@/server/db/prisma";
 
 type ActivityInput = {
@@ -6,7 +8,7 @@ type ActivityInput = {
   action: string;
   entityType?: string;
   entityId?: string;
-  metadata?: Record<string, unknown>;
+  metadata?: Prisma.InputJsonObject;
 };
 
 export async function logActivity({

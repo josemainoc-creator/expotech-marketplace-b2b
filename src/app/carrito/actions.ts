@@ -16,9 +16,11 @@ export async function submitOrderAction(formData: FormData) {
   const session = await requireRole(["BUYER"]);
   await assertBuyerApproved(session.user.id);
 
-  if (!session.user.companyId) {
-    redirect("/carrito?error=empresa");
-  }
+  const buyerCompanyId = session.user.companyId;
+
+if (!buyerCompanyId) {
+  redirect("/carrito?error=empresa");
+}
 
   const parsed = submitOrderSchema.parse(Object.fromEntries(formData));
   const cartItems = cartItemSchema.array().parse(JSON.parse(parsed.cartJson));
@@ -80,7 +82,7 @@ export async function submitOrderAction(formData: FormData) {
     const createdOrder = await tx.order.create({
       data: {
         campaignId: products[0].campaignId,
-        buyerCompanyId: session.user.companyId,
+        buyerCompanyId,
         buyerUserId: session.user.id,
         status: "submitted",
         subtotal,
