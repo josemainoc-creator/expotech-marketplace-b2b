@@ -330,3 +330,4 @@ Reportar:
 - cómo probar panel admin pedidos
 - cómo probar panel cliente pedidos
 - pendientes para Etapa 6
+Add stage 5 task specification
