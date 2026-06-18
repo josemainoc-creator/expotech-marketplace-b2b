@@ -1,0 +1,378 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  SUPER_ADMIN_EXPOTECH
+  CLIENT_ADMIN
+  BUYER
+}
+
+enum UserStatus {
+  active
+  inactive
+  pending
+}
+
+enum CompanyStatus {
+  active
+  inactive
+  pending
+}
+
+enum BuyerApprovalStatus {
+  pending
+  approved
+  rejected
+  inactive
+}
+
+enum CampaignStatus {
+  draft
+  active
+  paused
+  closed
+  archived
+}
+
+enum CampaignAccessType {
+  invitation_only
+  approval_required
+}
+
+enum ProductStatus {
+  draft
+  active
+  inactive
+  out_of_stock
+}
+
+enum InvitationStatus {
+  created
+  sent
+  opened
+  registered
+  expired
+  cancelled
+}
+
+enum OrderStatus {
+  draft
+  submitted
+  under_review
+  approved
+  rejected
+  fulfilled
+  cancelled
+}
+
+enum EmailStatus {
+  queued
+  sent
+  failed
+  opened
+  clicked
+}
+
+enum LeadPriority {
+  low
+  medium
+  high
+}
+
+enum LeadPipelineStatus {
+  new
+  contacted
+  interested
+  approved
+  rejected
+  inactive
+}
+
+model User {
+  id            String      @id @default(cuid())
+  name          String
+  email         String      @unique
+  phone         String?
+  passwordHash  String?
+  role          UserRole    @default(BUYER)
+  companyId     String?
+  company       Company?    @relation(fields: [companyId], references: [id])
+  status        UserStatus  @default(active)
+  buyerProfile  BuyerProfile?
+  orders        Order[]     @relation("BuyerOrders")
+  activityLogs  ActivityLog[]
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+
+  @@index([companyId])
+  @@index([role])
+}
+
+model Company {
+  id             String          @id @default(cuid())
+  name           String
+  rut            String?         @unique
+  businessType   String?
+  contactName    String?
+  email          String?
+  phone          String?
+  region         String?
+  comuna         String?
+  address        String?
+  website        String?
+  status         CompanyStatus   @default(pending)
+  users          User[]
+  buyerProfiles  BuyerProfile[]
+  clientProfile  ClientProfile?
+  campaigns      Campaign[]      @relation("ClientCampaigns")
+  buyerOrders    Order[]         @relation("BuyerCompanyOrders")
+  leadStatuses   LeadStatus[]
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+
+  @@index([status])
+}
+
+model BuyerProfile {
+  id                       String                @id @default(cuid())
+  userId                   String                @unique
+  user                     User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  companyId                String
+  company                  Company               @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  businessType             String?
+  monthlyPurchaseEstimate  Decimal?              @db.Decimal(12, 2)
+  categoriesOfInterest     String[]              @default([])
+  approvalStatus           BuyerApprovalStatus   @default(pending)
+  approvedAt               DateTime?
+  rejectedReason           String?
+  createdAt                DateTime              @default(now())
+  updatedAt                DateTime              @updatedAt
+
+  @@index([companyId])
+  @@index([approvalStatus])
+}
+
+model ClientProfile {
+  id                      String   @id @default(cuid())
+  companyId               String   @unique
+  company                 Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  commercialContactName   String?
+  commercialContactEmail  String?
+  commercialContactPhone  String?
+  billingContactName      String?
+  billingContactEmail     String?
+  createdAt               DateTime @default(now())
+  updatedAt               DateTime @updatedAt
+}
+
+model Campaign {
+  id                   String          @id @default(cuid())
+  slug                 String          @unique
+  name                 String
+  clientCompanyId      String
+  clientCompany        Company         @relation("ClientCampaigns", fields: [clientCompanyId], references: [id])
+  description          String?
+  shortDescription     String?
+  startDate            DateTime?
+  endDate              DateTime?
+  status               CampaignStatus  @default(draft)
+  accessType           CampaignAccessType @default(invitation_only)
+  termsAndConditions   String?
+  minimumOrderAmount   Decimal?        @db.Decimal(12, 2)
+  heroImageUrl         String?
+  categories           ProductCategory[]
+  products             Product[]
+  orders               Order[]
+  invitations          Invitation[]
+  activityLogs         ActivityLog[]
+  emailLogs            EmailLog[]
+  leadStatuses         LeadStatus[]
+  createdAt            DateTime        @default(now())
+  updatedAt            DateTime        @updatedAt
+
+  @@index([clientCompanyId])
+  @@index([status])
+}
+
+model ProductCategory {
+  id          String    @id @default(cuid())
+  campaignId  String
+  campaign    Campaign  @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  name        String
+  slug        String
+  description String?
+  sortOrder   Int       @default(0)
+  products    Product[]
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@unique([campaignId, slug])
+  @@index([campaignId])
+}
+
+model Product {
+  id                String           @id @default(cuid())
+  campaignId        String
+  campaign          Campaign         @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  categoryId        String?
+  category          ProductCategory? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  sku               String
+  name              String
+  brand             String?
+  description       String?
+  regularPrice      Decimal?         @db.Decimal(12, 2)
+  liquidationPrice  Decimal?         @db.Decimal(12, 2)
+  wholesalePrice    Decimal          @db.Decimal(12, 2)
+  minOrderQty       Int              @default(1)
+  unitType          String
+  unitsPerBox       Int?
+  availableStock    Int              @default(0)
+  expirationDate    DateTime?
+  status            ProductStatus    @default(draft)
+  featured          Boolean          @default(false)
+  imageUrl          String?
+  images            ProductImage[]
+  orderItems        OrderItem[]
+  createdAt         DateTime         @default(now())
+  updatedAt         DateTime         @updatedAt
+
+  @@unique([campaignId, sku])
+  @@index([campaignId, status])
+  @@index([categoryId])
+}
+
+model ProductImage {
+  id         String   @id @default(cuid())
+  productId  String
+  product    Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  url        String
+  altText    String?
+  sortOrder  Int      @default(0)
+  createdAt  DateTime @default(now())
+
+  @@index([productId])
+}
+
+model Order {
+  id                         String       @id @default(cuid())
+  campaignId                 String
+  campaign                   Campaign     @relation(fields: [campaignId], references: [id])
+  buyerCompanyId             String
+  buyerCompany               Company      @relation("BuyerCompanyOrders", fields: [buyerCompanyId], references: [id])
+  buyerUserId                String
+  buyerUser                  User         @relation("BuyerOrders", fields: [buyerUserId], references: [id])
+  status                     OrderStatus  @default(draft)
+  subtotal                   Decimal      @default(0) @db.Decimal(12, 2)
+  notes                      String?
+  paymentConditionRequested  String?
+  deliveryMethodRequested    String?
+  adminNotes                 String?
+  items                      OrderItem[]
+  createdAt                  DateTime     @default(now())
+  updatedAt                  DateTime     @updatedAt
+
+  @@index([campaignId])
+  @@index([buyerCompanyId])
+  @@index([buyerUserId])
+  @@index([status])
+}
+
+model OrderItem {
+  id           String   @id @default(cuid())
+  orderId      String
+  order        Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  productId    String
+  product      Product  @relation(fields: [productId], references: [id])
+  sku          String
+  productName  String
+  quantity     Int
+  unitPrice    Decimal  @db.Decimal(12, 2)
+  lineTotal    Decimal  @db.Decimal(12, 2)
+  createdAt    DateTime @default(now())
+
+  @@index([orderId])
+  @@index([productId])
+}
+
+model Invitation {
+  id            String            @id @default(cuid())
+  campaignId    String
+  campaign      Campaign          @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  email         String
+  companyName   String?
+  contactName   String?
+  phone         String?
+  token         String            @unique
+  status        InvitationStatus  @default(created)
+  expiresAt     DateTime
+  openedAt      DateTime?
+  registeredAt  DateTime?
+  createdAt     DateTime          @default(now())
+
+  @@index([campaignId])
+  @@index([email])
+  @@index([status])
+}
+
+model ActivityLog {
+  id          String    @id @default(cuid())
+  userId      String?
+  user        User?     @relation(fields: [userId], references: [id], onDelete: SetNull)
+  campaignId  String?
+  campaign    Campaign? @relation(fields: [campaignId], references: [id], onDelete: SetNull)
+  action      String
+  entityType  String?
+  entityId    String?
+  metadata    Json?
+  createdAt   DateTime  @default(now())
+
+  @@index([userId])
+  @@index([campaignId])
+  @@index([action])
+}
+
+model EmailLog {
+  id                 String      @id @default(cuid())
+  campaignId         String?
+  campaign           Campaign?   @relation(fields: [campaignId], references: [id], onDelete: SetNull)
+  recipientEmail     String
+  subject            String
+  templateName       String
+  status             EmailStatus @default(queued)
+  providerMessageId  String?
+  sentAt             DateTime?
+  openedAt           DateTime?
+  clickedAt          DateTime?
+  metadata           Json?
+
+  @@index([campaignId])
+  @@index([recipientEmail])
+  @@index([status])
+}
+
+model LeadStatus {
+  id              String              @id @default(cuid())
+  campaignId      String
+  campaign        Campaign            @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  companyId       String
+  company         Company             @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  status          LeadPipelineStatus  @default(new)
+  priority        LeadPriority        @default(medium)
+  source          String?
+  lastContactAt   DateTime?
+  nextFollowUpAt  DateTime?
+  notes           String?
+  createdAt       DateTime            @default(now())
+  updatedAt       DateTime            @updatedAt
+
+  @@unique([campaignId, companyId])
+  @@index([campaignId])
+  @@index([companyId])
+  @@index([status])
+}
