@@ -430,3 +430,4 @@ Al terminar, reportar:
 - cómo probar comprador aprobado
 - cómo probar comprador no aprobado
 - pendientes para Etapa 5
+Add stage 4 task in correct folder
